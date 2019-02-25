@@ -152,6 +152,9 @@ class CaptioningRNN(object):
         if self.cell_type == 'rnn':
             h, cache_rnn = rnn_forward(vectors_in, h0, Wx, Wh, b) #T-1
 
+        if self.cell_type == 'lstm':
+            h, cache_lstm = lstm_forward(vectors_in, h0, Wx, Wh, b)
+
         # (4) Use a (temporal) affine transformation to compute scores over the
         #     vocabulary at every timestep using the hidden states
 
@@ -166,8 +169,13 @@ class CaptioningRNN(object):
         dh, grads['W_vocab'], grads['b_vocab'] = \
          temporal_affine_backward(dscores, cache_vocab)
 
-        dvectors_in, dh0, grads['Wx'], grads['Wh'], grads['b'] = \
-         rnn_backward(dh, cache_rnn)
+
+        if self.cell_type == 'rnn':
+            dvectors_in, dh0, grads['Wx'], grads['Wh'], grads['b'] = \
+             rnn_backward(dh, cache_rnn)
+        if self.cell_type == 'lstm':
+            dvectors_in, dh0, grads['Wx'], grads['Wh'], grads['b'] = \
+             lstm_backward(dh, cache_lstm)
 
         grads['W_embed'] = word_embedding_backward(dvectors_in, cache_embed)
 
@@ -239,17 +247,21 @@ class CaptioningRNN(object):
         # Initialize the hidden state of the RNN
         h0, cache = affine_forward(features, W_proj, b_proj)
         h = h0
+        c = 0
         captions_in = self._start
 
         # timestep
         for t in range(max_length):
             vectors_in, cache_embed = word_embedding_forward(captions_in, W_embed)
-            h, cache = rnn_step_forward(vectors_in, h, Wx, Wh, b)
+
+            if self.cell_type == 'rnn':
+                h, cache = rnn_step_forward(vectors_in, h, Wx, Wh, b)
+            if self.cell_type == 'lstm':
+                h, c, cacha = lstm_step_forward(vectors_in, h, c, Wx, Wh, b)
+
             scores, cache_vocab = affine_forward(h, W_vocab, b_vocab)
             captions_in = np.argmax(scores, axis=1)
             captions[:, t] = captions_in
-
-
 
         ############################################################################
         #                             END OF YOUR CODE                             #
